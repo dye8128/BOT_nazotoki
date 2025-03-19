@@ -30,6 +30,7 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			sendChannelID = channelName2ID(s, m.GuildID, strVal)
 		}
 		if sendChannelID == "" {
+			sendChannelID = m.ChannelID
 			log.Println("Channel not found")
 			s.ChannelMessageSend(m.ChannelID, "Channel not found")
 			return
@@ -144,7 +145,7 @@ func channelName2ID(s *discordgo.Session, guildID string, channelName string) st
 	channels, err := s.GuildChannels(guildID)
 	if err != nil {
 		log.Println("Error getting channels:", err)
-		return sendChannelID
+		return ""
 	}
 
 	for _, channel := range channels {
@@ -153,7 +154,7 @@ func channelName2ID(s *discordgo.Session, guildID string, channelName string) st
 		}
 	}
 
-	return sendChannelID
+	return ""
 }
 
 // ロール名からロールIDを取得する
