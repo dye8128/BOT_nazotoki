@@ -35,7 +35,7 @@ func main() {
 	<-stopBot
 
 	log.Println("Bot is stopping")
-	
+
 	err = discord.Close()
 	if err != nil {
 		log.Fatal(err)
