@@ -32,8 +32,21 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		s.ChannelMessageSend(m.ChannelID, "Send channel seted")
 	}
+
+	if strings.HasPrefix(m.Content, "deleteMessage") {
+		// メッセージリンクからメッセージIDを取得
+		strVal := strings.Split(m.Content, " ")[1]
+		messageID := strings.Split(strVal, "/")[6]
+		log.Println("Delete message ID:", messageID)
+		err := s.ChannelMessageDelete(m.ChannelID, messageID)
+		if err != nil {
+			log.Println("Error deleting message:", err)
+			s.ChannelMessageSend(m.ChannelID, "Error deleting message")
+		}
+	}
 }
 
+// チャンネル名からチャンネルIDを取得する
 func channelName2ID(s *discordgo.Session, guildID string, channelName string) string {
 	channels, err := s.GuildChannels(guildID)
 	if err != nil {
