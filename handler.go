@@ -72,6 +72,32 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		s.ChannelMessageSend(m.ChannelID, "Role created: "+role.Name)
 	}
+
+	if strings.HasPrefix(m.Content, "deleteRole") {
+		// prefix: deleteRole {ロール名} OR deleteRole {ロールメンション}
+		strVal := strings.Split(m.Content, " ")[1]
+		var roleID string
+		if strings.HasPrefix(strVal, "<@&") {
+			roleID = strings.TrimRight(strings.TrimLeft(strVal, "<@&"), ">")
+		} else {
+			roleID = roleName2ID(s, m.GuildID, strVal)
+		}
+
+		if roleID == "" {
+			log.Println("Role not found")
+			s.ChannelMessageSend(m.ChannelID, "Role not found")
+			return
+		}
+
+		err := s.GuildRoleDelete(m.GuildID, roleID)
+		if err != nil {
+			log.Println("Error deleting role:", err)
+			s.ChannelMessageSend(m.ChannelID, "Error deleting role")
+			return
+		}
+
+		s.ChannelMessageSend(m.ChannelID, "Role deleted")
+	}
 }
 
 // チャンネル名からチャンネルIDを取得する
@@ -89,6 +115,23 @@ func channelName2ID(s *discordgo.Session, guildID string, channelName string) st
 	}
 
 	return sendChannelID
+}
+
+// ロール名からロールIDを取得する
+func roleName2ID(s *discordgo.Session, guildID string, roleName string) string {
+	roles, err := s.GuildRoles(guildID)
+	if err != nil {
+		log.Println("Error getting roles:", err)
+		return ""
+	}
+
+	for _, role := range roles {
+		if role.Name == roleName {
+			return role.ID
+		}
+	}
+
+	return ""
 }
 
 func existsRole(s *discordgo.Session, guildID string, roleName string) bool {
