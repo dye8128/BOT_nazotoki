@@ -26,8 +26,9 @@ func main() {
 
 	sendChannelID = ""
 	dg.AddHandler(onMessageCreate)
+	dg.AddHandler(reactionAdd)
 
-	dg.Identify.Intents = discordgo.IntentsGuildMessages
+	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMessageReactions
 
 	err = dg.Open()
 	if err != nil {

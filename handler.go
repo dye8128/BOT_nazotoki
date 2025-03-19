@@ -274,3 +274,7 @@ func getParentID(s *discordgo.Session, channelID string) string {
 
 	return channel.ParentID
 }
+
+func reactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
+	log.Println("Reaction added: ", r.Emoji.Name)
+}
