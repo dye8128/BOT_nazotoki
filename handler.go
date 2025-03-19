@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"strings"
+	"fmt"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -142,6 +143,59 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		s.ChannelMessageSend(m.ChannelID, "Channel deleted")
+	}
+
+	if strings.HasPrefix(m.Content, "limitViewer") {
+		// prefix: limitViewer {ロール名} OR limitViewer {ロールメンション}
+		strVal := strings.Split(m.Content, " ")[1]
+		var roleID string
+		if strings.HasPrefix(strVal, "<@&") {
+			roleID = strings.TrimRight(strings.TrimLeft(strVal, "<@&"), ">")
+		} else {
+			roleID = roleName2ID(s, m.GuildID, strVal)
+		}
+
+		if roleID == "" {
+			log.Println("Role not found")
+			s.ChannelMessageSend(m.ChannelID, "Role not found")
+			return
+		}
+		log.Println("Role ID:", roleID)
+
+		// チャンネルの現在の権限設定を取得
+		channel, err := s.Channel(m.ChannelID)
+		if err != nil {
+			log.Println("Failed to get channel:", err)
+			s.ChannelMessageSend(m.ChannelID, "Failed to get channel")
+			return
+		}
+
+		// @everyone の閲覧権限を削除
+		permissionEveryone := &discordgo.PermissionOverwrite{
+			ID:   channel.GuildID, // @everyone はサーバーID
+			Type: discordgo.PermissionOverwriteTypeRole,
+			Deny: discordgo.PermissionViewChannel,
+		}
+
+		// 指定ロールに閲覧権限を付与
+		permissionRole := &discordgo.PermissionOverwrite{
+			ID:    roleID,
+			Type:  discordgo.PermissionOverwriteTypeRole,
+			Allow: discordgo.PermissionViewChannel,
+		}
+
+		// チャンネルの権限を更新
+		_, err = s.ChannelEditComplex(m.ChannelID, &discordgo.ChannelEdit{
+			PermissionOverwrites: []*discordgo.PermissionOverwrite{permissionEveryone, permissionRole},
+		})
+		if err != nil {
+			log.Println("Failed to update channel permission:", err)
+			s.ChannelMessageSend(m.ChannelID, "Failed to update channel permission")
+			return
+		}
+
+		// 成功メッセージを送信
+		s.ChannelMessageSend(sendChannelID, fmt.Sprintf("https://discordapp.com/channels/%s/%s の閲覧をロール <@&%s> のみに変更しました。", m.GuildID, m.ChannelID, roleID))
 	}
 }
 
