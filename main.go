@@ -10,6 +10,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var sendChannelID string
+
 func main() {
 	err := godotenv.Load(".env")
 	if err != nil {
