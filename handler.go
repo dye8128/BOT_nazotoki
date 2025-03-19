@@ -23,9 +23,9 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if strings.HasPrefix(m.Content, "sendChannel") {
 		strVal := strings.Split(m.Content, " ")[1]
-		// prefix: sendChannel link {チャンネルリンク} OR sendChannel {チャンネル名}
-		if strVal == "link" {
-			sendChannelID = strings.Split((strings.Split(m.Content, " ")[2]), "/")[5]
+		// prefix: sendChannel {チャンネルリンク} OR sendChannel {チャンネル名}
+		if strings.HasPrefix(strVal, "https://discord.com/channels/") {
+			sendChannelID = strings.Split(strVal, "/")[5]
 		} else {
 			sendChannelID = channelName2ID(s, m.GuildID, strVal)
 		}
