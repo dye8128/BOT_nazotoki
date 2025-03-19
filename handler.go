@@ -23,7 +23,13 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if strings.HasPrefix(m.Content, "sendChannel") {
-		sendChannelID = channelName2ID(s, m.GuildID, m.Content[12:])
+		strVal := strings.Split(m.Content, " ")[1]
+		// prefix: sendChannel link {チャンネルリンク} OR sendChannel {チャンネル名}
+		if strVal == "link" {
+			sendChannelID = strings.Split((strings.Split(m.Content, " ")[2]), "/")[5]
+		} else {
+			sendChannelID = channelName2ID(s, m.GuildID, strVal)
+		}
 		if sendChannelID == "" {
 			log.Println("Channel not found")
 			s.ChannelMessageSend(m.ChannelID, "Channel not found")
@@ -34,6 +40,7 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if strings.HasPrefix(m.Content, "deleteMessage") {
+		// prefix: deleteMessage {メッセージリンク}
 		// メッセージリンクからメッセージIDを取得
 		strVal := strings.Split(m.Content, " ")[1]
 		messageID := strings.Split(strVal, "/")[6]
