@@ -24,7 +24,7 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if strings.HasPrefix(m.Content, "sendChannel") {
 		strVal := strings.Split(m.Content, " ")[1]
 		// prefix: sendChannel {チャンネルリンク} OR sendChannel {チャンネル名}
-		if strings.HasPrefix(strVal, "https://discord.com/channels/") {
+		if strings.HasPrefix(strVal, "https://discordapp.com/channels/") {
 			sendChannelID = strings.Split(strVal, "/")[5]
 		} else {
 			sendChannelID = channelName2ID(s, m.GuildID, strVal)
@@ -98,6 +98,45 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		s.ChannelMessageSend(m.ChannelID, "Role deleted")
 	}
+
+	if(strings.HasPrefix(m.Content, "createChannel")) {
+		// prefix: createChannel {チャンネル名}
+		channelName := strings.Split(m.Content, " ")[1]
+		if(existsChannel(s, m.GuildID, channelName)) {
+			s.ChannelMessageSend(m.ChannelID, "Channel already exists")
+			return
+		}
+
+		s.GuildChannelCreate(m.GuildID, channelName, discordgo.ChannelTypeGuildText)
+		s.ChannelMessageSend(m.ChannelID, "Channel created")
+	}
+
+	if(strings.HasPrefix(m.Content, "deleteChannel")) {
+		// prefix: deleteChannel {チャンネル名} OR deleteChannel {チャンネルリンク}
+		strVal := strings.Split(m.Content, " ")[1]
+		var channelID string
+		if strings.HasPrefix(strVal, "https://discordapp.com/channels/") {
+			channelID = strings.Split(strVal, "/")[5]
+		} else {
+			channelID = channelName2ID(s, m.GuildID, strVal)
+		}
+
+		if channelID == "" {
+			log.Println("Channel not found")
+			s.ChannelMessageSend(m.ChannelID, "Channel not found")
+			return
+		}
+		log.Println("Delete channel ID:", channelID)
+
+		_, err := s.ChannelDelete(channelID)
+		if err != nil {
+			log.Println("Error deleting channel:", err)
+			s.ChannelMessageSend(m.ChannelID, "Error deleting channel")
+			return
+		}
+
+		s.ChannelMessageSend(m.ChannelID, "Channel deleted")
+	}
 }
 
 // チャンネル名からチャンネルIDを取得する
@@ -132,6 +171,22 @@ func roleName2ID(s *discordgo.Session, guildID string, roleName string) string {
 	}
 
 	return ""
+}
+
+func existsChannel(s *discordgo.Session, guildID string, channelName string) bool {
+	channels, err := s.GuildChannels(guildID)
+	if err != nil {
+		log.Println("Error getting channels:", err)
+		return false
+	}
+
+	for _, channel := range channels {
+		if channel.Name == channelName {
+			return true
+		}
+	}
+
+	return false
 }
 
 func existsRole(s *discordgo.Session, guildID string, roleName string) bool {

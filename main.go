@@ -24,6 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	sendChannelID = ""
 	dg.AddHandler(onMessageCreate)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
