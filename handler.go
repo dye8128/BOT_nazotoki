@@ -108,7 +108,12 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			return
 		}
 
-		s.GuildChannelCreate(m.GuildID, channelName, discordgo.ChannelTypeGuildText)
+		channelData := discordgo.GuildChannelCreateData{
+			Name: channelName,
+			Type: discordgo.ChannelTypeGuildText,
+			ParentID: getParentID(s, m.ChannelID),
+		}
+		s.GuildChannelCreateComplex(m.GuildID, channelData)
 		s.ChannelMessageSend(m.ChannelID, "Channel created")
 	}
 
@@ -204,4 +209,14 @@ func existsRole(s *discordgo.Session, guildID string, roleName string) bool {
 	}
 
 	return false
+}
+
+func getParentID(s *discordgo.Session, channelID string) string {
+	channel, err := s.Channel(channelID)
+	if err != nil {
+		log.Println("Error getting channel:", err)
+		return ""
+	}
+
+	return channel.ParentID
 }
