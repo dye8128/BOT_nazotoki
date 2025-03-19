@@ -7,6 +7,7 @@ import (
 )
 
 func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	// Bot からのメッセージは無視する
 	if m.Author.Bot {
 		return
 	}
