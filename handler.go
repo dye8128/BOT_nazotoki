@@ -197,6 +197,11 @@ func onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		// 成功メッセージを送信
 		s.ChannelMessageSend(sendChannelID, fmt.Sprintf("https://discordapp.com/channels/%s/%s の閲覧をロール <@&%s> のみに変更しました。", m.GuildID, m.ChannelID, roleID))
 	}
+
+	if strings.HasPrefix(m.Content, "addRole") {
+		// prefix: addRole {ロール名} OR addRole {ロールメンション}
+		s.MessageReactionAdd(m.ChannelID, m.ID, "👍")
+	}
 }
 
 // チャンネル名からチャンネルIDを取得する
@@ -277,4 +282,39 @@ func getParentID(s *discordgo.Session, channelID string) string {
 
 func reactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 	log.Println("Reaction added: ", r.Emoji.Name)
+	message, err := s.ChannelMessage(r.ChannelID, r.MessageID)
+	if err != nil {
+		log.Println("Error getting message:", err)
+		return
+	}
+
+	if strings.HasPrefix(message.Content, "addRole") {
+		// 自分自身によるリアクションは無視
+		if r.UserID == s.State.User.ID {
+			return
+		}
+		// prefix: addRole {ロール名} OR addRole {ロールメンション}
+		strVal := strings.Split(message.Content, " ")[1]
+		var roleID string
+		if strings.HasPrefix(strVal, "<@&") {
+			roleID = strings.TrimRight(strings.TrimLeft(strVal, "<@&"), ">")
+		} else {
+			roleID = roleName2ID(s, r.GuildID, strVal)
+		}
+
+		if roleID == "" {
+			log.Println("Role not found")
+			s.ChannelMessageSend(r.ChannelID, "Role not found")
+			return
+		}
+
+		err := s.GuildMemberRoleAdd(r.GuildID, r.UserID, roleID)
+		if err != nil {
+			log.Println("Error adding role:", err)
+			s.ChannelMessageSend(r.ChannelID, "Error adding role")
+			return
+		}
+
+		s.ChannelMessageSend(r.ChannelID, "Role added")
+	}
 }
