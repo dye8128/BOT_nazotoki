@@ -24,8 +24,9 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				return
 			}
 			sendChannel := channelName2ID(s, i, strVals[0].StringValue())
-			if sendChannel == "" {
-				s.ChannelMessageSend(i.ChannelID, "Channel not found")
+			_, err := s.Channel(sendChannel)
+			if err != nil {
+				raiseError(s, i, "Error getting channel", err)
 				return
 			}
 			sendChannelIDs[i.GuildID] = sendChannel
@@ -191,7 +192,10 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			}
 			roleID := roleName2ID(s, i.GuildID, strVals[0].StringValue())
 			message	:= fmt.Sprintf("ロール <@&%s> を付与します", roleID)
-			sendMessage(s, i, message)
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+			})
+			s.ChannelMessageSend(sendChannelID, message)
 			// 最新のメッセージを取得
 			messages, err := s.ChannelMessages(sendChannelID, 1, "", "", "")
 			if err != nil {
@@ -202,8 +206,16 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			err = s.MessageReactionAdd(sendChannelID, messages[0].ID, "👍")
 			if err != nil {
 				log.Println("Error adding reaction:", err)
-				s.ChannelMessageSend(sendChannelIDs[i.GuildID], "Error adding reaction")
+				s.ChannelMessageSend(sendChannelID, "Error adding reaction")
+				return
 			}
+			// 自分にロールを付与
+			err = s.GuildMemberRoleAdd(i.GuildID, s.State.User.ID, roleID)
+			if err != nil {
+				raiseError(s, i, "Error adding role", err)
+				return
+			}
+			s.InteractionResponseDelete(i.Interaction)		
 		}
 	}
 }
@@ -238,17 +250,17 @@ func channelName2ID(s *discordgo.Session, i *discordgo.InteractionCreate, channe
 	}
 
 	// チャンネルリンク形式
-	if strings.HasPrefix(channelName ,"https://discordapp.com/channels/") {
+	if strings.HasPrefix(channelName ,"https://discord") {
 		return strings.Split(channelName, "/")[5]
 	}
 
 	// チャンネル名の文字列
-	guild, err := s.Guild(i.GuildID)
+	channels, err := s.GuildChannels(i.GuildID)
 	if err != nil {
 		log.Println("Error getting guild:", err)
 		return ""
 	}
-	for _, channel := range guild.Channels {
+	for _, channel := range channels {
 		if channel.Name == channelName {
 			return channel.ID
 		}
@@ -258,7 +270,7 @@ func channelName2ID(s *discordgo.Session, i *discordgo.InteractionCreate, channe
 
 func messageLink2ID(messageLink string) (string) {
 	// メッセージリンク形式
-	if strings.HasPrefix(messageLink, "https://discordapp.com/channels/") {
+	if strings.HasPrefix(messageLink, "https://discord") {
 		return strings.Split(messageLink, "/")[6]
 	}
 
