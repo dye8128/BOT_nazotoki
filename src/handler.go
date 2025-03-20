@@ -14,12 +14,11 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Member.User.Bot {
 		return
 	}
-	log.Printf("Interaction from %s: %s", i.Member.User.Username, i.Data.Type().String())
 
 	if i.Type == discordgo.InteractionApplicationCommand {
 		data := i.ApplicationCommandData()
 		strVals := data.Options
-		if data.Name == "sendChannel" {
+		if data.Name == "send_channel" {
 			if len(strVals) != 1 {
 				valuesLengthError(s, i)
 				return
@@ -37,7 +36,7 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 		sendChannelID, exists := sendChannelIDs[i.GuildID]
 		if !exists {
-			s.ChannelMessageSend(sendChannelID, "Channel is not set")
+			sendMessage(s, i, "Channel not set")
 			return
 		}
 
@@ -185,7 +184,7 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				message := fmt.Sprintf("https://discordapp.com/channels/%s/%s の閲覧をロール <@&%s> のみに変更しました", i.GuildID, channelID, roleID)
 				sendMessage(s, i, message)
 			}
-		case "addRole":
+		case "add_role":
 			if len(strVals) != 1 {
 				valuesLengthError(s, i)
 				return
