@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strings"
-	"fmt"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -189,10 +189,17 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				valuesLengthError(s, i)
 				return
 			}
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-			})
-			err := s.MessageReactionAdd(i.ChannelID, i.ID, "👍")
+			roleID := roleName2ID(s, i.GuildID, strVals[0].StringValue())
+			message	:= fmt.Sprintf("ロール <@&%s> を付与します", roleID)
+			sendMessage(s, i, message)
+			// 最新のメッセージを取得
+			messages, err := s.ChannelMessages(sendChannelID, 1, "", "", "")
+			if err != nil {
+				raiseError(s, i, "Error getting messages", err)
+				return
+			}
+			// メッセージにリアクションを追加
+			err = s.MessageReactionAdd(sendChannelID, messages[0].ID, "👍")
 			if err != nil {
 				log.Println("Error adding reaction:", err)
 				s.ChannelMessageSend(sendChannelIDs[i.GuildID], "Error adding reaction")
@@ -300,15 +307,15 @@ func reactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 		return
 	}
 
-	if strings.HasPrefix(message.Content, "/addRole") {
-		roleID := roleName2ID(s, r.GuildID, strings.Split(message.Content, " ")[1])
+	if strings.HasPrefix(message.Content, "ロール <@&") {
+		roleID := strings.TrimRight(strings.TrimLeft(message.Content, "ロール <@&"), "> を付与します")
 		err := s.GuildMemberRoleAdd(r.GuildID, r.UserID, roleID)
 		if err != nil {
 			log.Println("Error adding role:", err)
 			s.ChannelMessageSend(sendChannelIDs[r.GuildID], "Error adding role")
 			return
 		}
-		message := fmt.Sprintf("<@%s> にロールを付与しました", r.UserID)
+		message := fmt.Sprintf("<@%s> にロール <@&%s> を付与しました", r.UserID, roleID)
 		s.ChannelMessageSend(sendChannelIDs[r.GuildID], message)
 	}
 }
