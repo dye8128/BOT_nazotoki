@@ -55,6 +55,13 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				raiseError(s, i, "Error deleting message", err)
 				return
 			}
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "該当メッセージを削除しました",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
 		case "create_role":
 			if len(strVals) != 1 {
 				valuesLengthError(s, i)
