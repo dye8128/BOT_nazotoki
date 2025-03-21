@@ -313,6 +313,10 @@ func roleName2ID(s *discordgo.Session, guildID string, roleName string) (string,
 		}
 	}
 
+	_, err = s.State.Role(guildID, roleName)
+	if err != nil {
+		return "", err
+	}
 	return roleName, nil
 }
 
