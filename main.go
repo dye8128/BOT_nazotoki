@@ -25,7 +25,7 @@ func main() {
 	}
 
 	dg.AddHandler(onInteractionCreate)
-	// dg.AddHandler(reactionAdd)
+	dg.AddHandler(reactionAdd)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMessageReactions
 
