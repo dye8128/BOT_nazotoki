@@ -125,6 +125,30 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			}
 			message = fmt.Sprintf("イベント「%s」の作成が正常に行われました", eventName)
 			sendMessage(s, i, message)
+		case "delete_event":
+			eventName := strVals[0].StringValue()
+			channelID, err := channelName2IDwithGuildID(s, i.GuildID, eventName)
+			if err != nil {
+				raiseError(s, i, "Error getting channel", err)
+				return
+			}
+			_, err = s.ChannelDelete(channelID)
+			if err != nil {
+				raiseError(s, i, "Error deleting channel", err)
+				return
+			}
+			roleID, err := roleName2ID(s, i.GuildID, eventName)
+			if err != nil {
+				raiseError(s, i, "Error getting role", err)
+				return
+			}
+			err = s.GuildRoleDelete(i.GuildID, roleID)
+			if err != nil {
+				raiseError(s, i, "Error deleting role", err)
+				return
+			}
+			message := fmt.Sprintf("イベント「%s」を削除しました", eventName)
+			sendMessage(s, i, message)
 		}
 	}
 }

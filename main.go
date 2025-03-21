@@ -59,6 +59,18 @@ func main() {
 				},
 			},
 		},
+		{
+			Name:        "delete_event",
+			Description: "Delete event",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "Event name",
+					Required:    true,
+				},
+			},
+		},
 	}
 
 	for _, command := range commands {
