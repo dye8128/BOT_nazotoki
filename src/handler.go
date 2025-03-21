@@ -96,8 +96,12 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				valuesLengthError(s, i)
 				return
 			}
-			roleID := roleName2ID(s, i.GuildID, strVals[0].StringValue())
-			err := s.GuildRoleDelete(i.GuildID, roleID)
+			roleID, err := roleName2ID(s, i.GuildID, strVals[0].StringValue())
+			if err != nil {
+				raiseError(s, i, "Error getting role", err)
+				return
+			}
+			err = s.GuildRoleDelete(i.GuildID, roleID)
 			if err != nil {
 				raiseError(s, i, "Error deleting role", err)
 				return
@@ -155,7 +159,11 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				valuesLengthError(s, i)
 				return
 			}
-			roleID := roleName2ID(s, i.GuildID, strVals[0].StringValue())
+			roleID, err := roleName2ID(s, i.GuildID, strVals[0].StringValue())
+			if err != nil {
+				raiseError(s, i, "Error getting role", err)
+				return
+			}
 			var channelID string
 			if len(strVals) == 1 {
 				channelID = channelName2ID(s, i, "here")
@@ -197,7 +205,11 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				valuesLengthError(s, i)
 				return
 			}
-			roleID := roleName2ID(s, i.GuildID, strVals[0].StringValue())
+			roleID, err := roleName2ID(s, i.GuildID, strVals[0].StringValue())
+			if err != nil {
+				raiseError(s, i, "Error getting role", err)
+				return
+			}
 			message	:= fmt.Sprintf("ロール <@&%s> を付与します", roleID)
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
@@ -284,25 +296,24 @@ func messageLink2ID(messageLink string) (string) {
 	return messageLink
 }
 
-func roleName2ID(s *discordgo.Session, guildID string, roleName string) string {
+func roleName2ID(s *discordgo.Session, guildID string, roleName string) (string, error) {
 	// ロールメンション形式
 	if strings.HasPrefix(roleName, "<@&") {
-		return strings.TrimRight(strings.TrimLeft(roleName, "<@&"), ">")
+		return strings.TrimRight(strings.TrimLeft(roleName, "<@&"), ">"), nil
 	}
 
 	// ロール名の文字列
 	roles, err := s.GuildRoles(guildID)
 	if err != nil {
-		log.Println("Error getting roles:", err)
-		return ""
+		return "", err
 	}
 	for _, role := range roles {
 		if role.Name == roleName {
-			return role.ID
+			return role.ID, nil
 		}
 	}
 
-	return roleName
+	return roleName, nil
 }
 
 func getParentID(s *discordgo.Session, channelID string) string {
