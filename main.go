@@ -10,7 +10,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var sendChannelID string
+var sendChannelIDs = make(map[string]string)
 
 func main() {
 	err := godotenv.Load(".env")
@@ -24,8 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sendChannelID = ""
-	dg.AddHandler(onMessageCreate)
+	dg.AddHandler(onInteractionCreate)
 	dg.AddHandler(reactionAdd)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMessageReactions
@@ -33,6 +32,52 @@ func main() {
 	err = dg.Open()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	commands := []discordgo.ApplicationCommand{
+		{
+			Name: 	     "send_channel",
+			Description: "Set send channel",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "channel",
+					Description: "Channel name or link",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "new_event",
+			Description: "Create new event",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "Event name",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "delete_event",
+			Description: "Delete event",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "Event name",
+					Required:    true,
+				},
+			},
+		},
+	}
+
+	for _, command := range commands {
+		_, err = dg.ApplicationCommandCreate(dg.State.User.ID, "", &command)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	log.Println("Bot is running")
