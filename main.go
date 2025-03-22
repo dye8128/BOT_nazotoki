@@ -18,6 +18,9 @@ func main() {
 		log.Fatal(err)
 	}
 	TOKEN := os.Getenv("TOKEN")
+	MY_GUILD_ID := os.Getenv("MY_GUILD_ID")
+	MY_CHANNEL_ID := os.Getenv("MY_CHANNEL_ID")
+	sendChannelIDs[MY_GUILD_ID] = MY_CHANNEL_ID
 
 	dg, err := discordgo.New("Bot " + TOKEN)
 	if err != nil {
