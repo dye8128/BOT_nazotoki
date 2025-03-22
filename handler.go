@@ -37,6 +37,9 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if !exists {
 				sendMessage(s, i, "Channel not set")
 				return
+			} else if sendChannelID == i.ChannelID {
+				sendMessage(s, i, "Select another channel for event creation")
+				return
 			}
 
 			eventName := strVals[0].StringValue()
@@ -220,7 +223,7 @@ func channelName2IDwithGuildID(s *discordgo.Session, guildID string, channelName
 		return "", err
 	}
 	for _, channel := range channels {
-		if channel.Name == channelName {
+		if channel.Name == strings.ToLower(channelName) {
 			channelName = channel.ID
 			break
 		}
