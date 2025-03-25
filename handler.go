@@ -191,6 +191,41 @@ func reactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 	}
 }
 
+func reactionRemove(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
+	if r.UserID == s.State.User.ID {
+		return
+	}
+	log.Printf("Reaction removed by %s", r.UserID)
+	message, err := s.ChannelMessage(r.ChannelID, r.MessageID)
+	if err != nil {
+		log.Println("Error getting message:", err)
+		return
+	}
+	log.Println(message.Content)
+
+	if strings.HasPrefix(message.Content, newEventPrefix) && strings.HasSuffix(message.Content, newEventSuffix) {
+		eventName := message.Content[len(newEventPrefix):len(message.Content)-len(newEventSuffix)]
+		log.Println(eventName)
+		roleID, err := roleName2ID(s, r.GuildID, eventName)
+		if err != nil {
+			log.Println("Error getting role:", err)
+			return
+		}
+		err = s.GuildMemberRoleRemove(r.GuildID, r.UserID, roleID)
+		if err != nil {
+			log.Println("Error removing role:", err)
+			return
+		}
+		channelID, err := channelName2IDwithGuildID(s, r.GuildID, eventName)
+		if err != nil {
+			log.Println("Error getting channel:", err)
+			return
+		}
+		message := fmt.Sprintf("<@%s> がこのイベントから離脱しました", r.UserID)
+		s.ChannelMessageSend(channelID, message)
+	}
+}
+
 func sendMessage(s *discordgo.Session, i *discordgo.InteractionCreate, message string) {
 	s.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
 		Content: message,
