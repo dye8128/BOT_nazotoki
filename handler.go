@@ -43,7 +43,7 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			}
 
 			eventName := strVals[0].StringValue()
-			eventLabel := strings.ToLower(strVals[1].StringValue())
+			eventLabel := strings.ToUpper(strVals[1].StringValue())
 			description := ""
 			if len(strVals) > 2 {
 				description = strVals[2].StringValue()
@@ -180,7 +180,7 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			sendMessage(s, i, message)
 		case "move_event":
 			eventName := strVals[0].StringValue()
-			eventLabel := strings.ToLower(strVals[1].StringValue())
+			eventLabel := strings.ToUpper(strVals[1].StringValue())
 			channelID, err := channelName2IDwithGuildID(s, i.GuildID, eventName)
 			if err != nil {
 				raiseError(s, i, "Error getting channel", err)
@@ -386,7 +386,7 @@ func getParentIDs(s *discordgo.Session, guildID string) map[string]string {
 		}
 	}
 	parentIDs := make(map[string]string)
-	for parentID, _ := range parentIDkeys {
+	for parentID := range parentIDkeys {
 		parentIDs[parentID] = parentID
 	}
 
