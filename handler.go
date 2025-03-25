@@ -83,17 +83,10 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			}
 			// チャンネル作成
 			// 親チャンネルが存在する場合はその下に作成
-			labelID := ""
-			for _, parentID := range getParentIDs(s, i.GuildID) {
-				parent, err := s.Channel(parentID)
-				if err != nil {
-					raiseError(s, i, "Error getting parent channel", err)
-					return
-				}
-				if parent.Name == eventLabel {
-					labelID = parentID
-					break
-				}
+			labelID, err := labelName2ID(s, i.GuildID, eventLabel)
+			if err != nil {
+				raiseError(s, i, "Error getting parent channel", err)
+				return
 			}
 			// 親チャンネルが存在しない場合は新規作成
 			if labelID == "" {
@@ -184,6 +177,48 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				return
 			}
 			message := fmt.Sprintf("イベント「%s」を削除しました", eventName)
+			sendMessage(s, i, message)
+		case "move_event":
+			eventName := strVals[0].StringValue()
+			eventLabel := strings.ToLower(strVals[1].StringValue())
+			channelID, err := channelName2IDwithGuildID(s, i.GuildID, eventName)
+			if err != nil {
+				raiseError(s, i, "Error getting channel", err)
+				return
+			}
+			channel, err := s.Channel(channelID)
+			if err != nil {
+				raiseError(s, i, "Error getting channel", err)
+				return
+			}
+			// レーベルから親チャンネルIDを取得
+			labelID, err := labelName2ID(s, i.GuildID, eventLabel)
+			if err != nil {
+				raiseError(s, i, "Error getting parent channel", err)
+				return
+			}
+			if labelID == "" {
+				raiseError(s, i, "Parent channel not found", nil)
+				return
+			}
+			// チャンネルの親チャンネルを変更
+			pastLabelID := getParentID(s, channelID)
+			channelEditData := discordgo.ChannelEdit{
+				ParentID: labelID,
+			}
+			_, err = s.ChannelEditComplex(channel.ID, &channelEditData)
+			if err != nil {
+				raiseError(s, i, "Error editing channel", err)
+				return
+			}
+			if len(getChildIDs(s, i.GuildID, pastLabelID)) == 0 {
+				_, err = s.ChannelDelete(pastLabelID)
+				if err != nil {
+					raiseError(s, i, "Error deleting label", err)
+					return
+				}
+			}
+			message := fmt.Sprintf("イベント「%s」を「%s」に移動しました", eventName, eventLabel)
 			sendMessage(s, i, message)
 		}
 	}
@@ -356,4 +391,34 @@ func getParentIDs(s *discordgo.Session, guildID string) map[string]string {
 	}
 
 	return parentIDs
+}
+
+func labelName2ID(s *discordgo.Session, guildID string, labelName string) (string, error) {
+	for _, parentID := range getParentIDs(s, guildID) {
+		parent, err := s.Channel(parentID)
+		if err != nil {
+			return "", err
+		}
+		if parent.Name == labelName {
+			return parentID, nil
+		}
+	}
+	return "", nil
+}
+
+func getChildIDs(s *discordgo.Session, guildID string, parentID string) []string {
+	channels, err := s.GuildChannels(guildID)
+	if err != nil {
+		log.Println("Error getting channels:", err)
+		return nil
+	}
+
+	childIDs := make([]string, 0)
+	for _, channel := range channels {
+		if channel.ParentID == parentID {
+			childIDs = append(childIDs, channel.ID)
+		}
+	}
+
+	return childIDs
 }

@@ -87,10 +87,28 @@ func main() {
 				},
 			},
 		},
+		{
+			Name:        "move_event",
+			Description: "Move event",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "Event name",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "label",
+					Description: "Label",
+					Required:    true,
+				},
+			},
+		},
 	}
 
 	for _, command := range commands {
-		_, err = dg.ApplicationCommandCreate(dg.State.User.ID, "925965338800185477", &command)
+		_, err = dg.ApplicationCommandCreate(dg.State.User.ID, "", &command)
 		if err != nil {
 			log.Fatal(err)
 		}
