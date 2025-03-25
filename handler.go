@@ -43,6 +43,11 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			}
 
 			eventName := strVals[0].StringValue()
+			eventLabel := strings.ToLower(strVals[1].StringValue())
+			description := ""
+			if len(strVals) > 2 {
+				description = strVals[2].StringValue()
+			}
 			// 既にロールが存在するか確認
 			roles, err := s.GuildRoles(i.GuildID)
 			if err != nil {
@@ -77,6 +82,33 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				return
 			}
 			// チャンネル作成
+			// 親チャンネルが存在する場合はその下に作成
+			labelID := ""
+			for _, parentID := range getParentIDs(s, i.GuildID) {
+				parent, err := s.Channel(parentID)
+				if err != nil {
+					raiseError(s, i, "Error getting parent channel", err)
+					return
+				}
+				if parent.Name == eventLabel {
+					labelID = parentID
+					break
+				}
+			}
+			// 親チャンネルが存在しない場合は新規作成
+			if labelID == "" {
+				labelData := discordgo.GuildChannelCreateData{
+					Name: eventLabel,
+					Type: discordgo.ChannelTypeGuildCategory,
+				}
+				label, err := s.GuildChannelCreateComplex(i.GuildID, labelData)
+				if err != nil {
+					raiseError(s, i, "Error creating parent channel", err)
+					return
+				}
+				labelID = label.ID
+			}
+
 			// @everyone の閲覧権限
 			permissionEveryone := &discordgo.PermissionOverwrite{
 				ID:   i.GuildID, // @everyone はサーバーID
@@ -92,7 +124,8 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			channelData := discordgo.GuildChannelCreateData{
 				Name: strVals[0].StringValue(),
 				Type: discordgo.ChannelTypeGuildText,
-				ParentID: getParentID(s, sendChannelID),
+				Topic: description,
+				ParentID: labelID,
 				PermissionOverwrites: []*discordgo.PermissionOverwrite{
 					permissionEveryone,
 					permissionRole,
@@ -302,4 +335,25 @@ func getParentID(s *discordgo.Session, channelID string) string {
 	}
 
 	return channel.ParentID
+}
+
+func getParentIDs(s *discordgo.Session, guildID string) map[string]string {
+	channels, err := s.GuildChannels(guildID)
+	if err != nil {
+		log.Println("Error getting channels:", err)
+		return nil
+	}
+
+	parentIDkeys := make(map[string]struct{})
+	for _, channel := range channels {
+		if channel.ParentID != "" {
+			parentIDkeys[channel.ParentID] = struct{}{}
+		}
+	}
+	parentIDs := make(map[string]string)
+	for parentID, _ := range parentIDkeys {
+		parentIDs[parentID] = parentID
+	}
+
+	return parentIDs
 }

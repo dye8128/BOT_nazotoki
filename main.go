@@ -61,6 +61,18 @@ func main() {
 					Description: "Event name",
 					Required:    true,
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "label",
+					Description: "Label",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "description",
+					Description: "Description",
+					Required:    false,
+				},
 			},
 		},
 		{
@@ -78,7 +90,7 @@ func main() {
 	}
 
 	for _, command := range commands {
-		_, err = dg.ApplicationCommandCreate(dg.State.User.ID, "", &command)
+		_, err = dg.ApplicationCommandCreate(dg.State.User.ID, "925965338800185477", &command)
 		if err != nil {
 			log.Fatal(err)
 		}
