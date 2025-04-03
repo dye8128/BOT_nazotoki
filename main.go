@@ -49,6 +49,7 @@ func main() {
 					Name:        "channel",
 					Description: "Channel name or link",
 					Required:    true,
+					Autocomplete: true,
 				},
 			},
 		},

@@ -24,13 +24,13 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		strVals := data.Options
 		switch data.Name {
 		case "send_channel":
-			sendChannel, err := channelName2ID(s, i, strVals[0].StringValue())
+			sendChannel, err := getChannelwithInteraction(s, i, strVals[0].StringValue())
 			if err != nil {
 				raiseError(s, i, "Error getting channel", err)
 				return
 			}
-			sendChannelIDs[i.GuildID] = sendChannel
-			message	:= fmt.Sprintf("招待チャンネルを <#%s> に設定しました", sendChannel)
+			sendChannelIDs[i.GuildID] = sendChannel.ID
+			message := fmt.Sprintf("招待チャンネルを <#%s> に設定しました", sendChannel.ID)
 			sendMessage(s, i, message)
 		case "new_event":
 			sendChannelID, exists := sendChannelIDs[i.GuildID]
@@ -43,7 +43,7 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			}
 
 			eventName := strVals[0].StringValue()
-			eventLabel := strings.ToUpper(strVals[1].StringValue())
+			parentName := strings.ToUpper(strVals[1].StringValue())
 			description := ""
 			if len(strVals) > 2 {
 				description = strVals[2].StringValue()
@@ -83,23 +83,22 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			}
 			// チャンネル作成
 			// 親チャンネルが存在する場合はその下に作成
-			labelID, err := labelName2ID(s, i.GuildID, eventLabel)
+			parent, err := getParent(s, i.GuildID, parentName)
 			if err != nil {
 				raiseError(s, i, "Error getting parent channel", err)
 				return
 			}
 			// 親チャンネルが存在しない場合は新規作成
-			if labelID == "" {
-				labelData := discordgo.GuildChannelCreateData{
-					Name: eventLabel,
+			if parent == nil {
+				parentData := discordgo.GuildChannelCreateData{
+					Name: parentName,
 					Type: discordgo.ChannelTypeGuildCategory,
 				}
-				label, err := s.GuildChannelCreateComplex(i.GuildID, labelData)
+				parent, err = s.GuildChannelCreateComplex(i.GuildID, parentData)
 				if err != nil {
 					raiseError(s, i, "Error creating parent channel", err)
 					return
 				}
-				labelID = label.ID
 			}
 
 			// @everyone の閲覧権限
@@ -115,10 +114,10 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				Allow: discordgo.PermissionViewChannel,
 			}
 			channelData := discordgo.GuildChannelCreateData{
-				Name: strVals[0].StringValue(),
-				Type: discordgo.ChannelTypeGuildText,
-				Topic: description,
-				ParentID: labelID,
+				Name:     eventName,
+				Type:     discordgo.ChannelTypeGuildText,
+				Topic:    description,
+				ParentID: parent.ID,
 				PermissionOverwrites: []*discordgo.PermissionOverwrite{
 					permissionEveryone,
 					permissionRole,
@@ -156,22 +155,23 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			sendMessage(s, i, message)
 		case "delete_event":
 			eventName := strVals[0].StringValue()
-			channelID, err := channelName2IDwithGuildID(s, i.GuildID, eventName)
+			channel, err := getChannel(s, i.GuildID, eventName)
+			eventName = channel.Name
 			if err != nil {
 				raiseError(s, i, "Error getting channel", err)
 				return
 			}
-			_, err = s.ChannelDelete(channelID)
+			_, err = s.ChannelDelete(channel.ID)
 			if err != nil {
 				raiseError(s, i, "Error deleting channel", err)
 				return
 			}
-			roleID, err := roleName2ID(s, i.GuildID, eventName)
+			role, err := getRole(s, i.GuildID, eventName)
 			if err != nil {
 				raiseError(s, i, "Error getting role", err)
 				return
 			}
-			err = s.GuildRoleDelete(i.GuildID, roleID)
+			err = s.GuildRoleDelete(i.GuildID, role.ID)
 			if err != nil {
 				raiseError(s, i, "Error deleting role", err)
 				return
@@ -180,45 +180,49 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			sendMessage(s, i, message)
 		case "move_event":
 			eventName := strVals[0].StringValue()
-			eventLabel := strings.ToUpper(strVals[1].StringValue())
-			channelID, err := channelName2IDwithGuildID(s, i.GuildID, eventName)
-			if err != nil {
-				raiseError(s, i, "Error getting channel", err)
-				return
-			}
-			channel, err := s.Channel(channelID)
+			parentName := strings.ToUpper(strVals[1].StringValue())
+			channel, err := getChannel(s, i.GuildID, eventName)
 			if err != nil {
 				raiseError(s, i, "Error getting channel", err)
 				return
 			}
 			// レーベルから親チャンネルIDを取得
-			labelID, err := labelName2ID(s, i.GuildID, eventLabel)
+			parent, err := getParent(s, i.GuildID, parentName)
 			if err != nil {
 				raiseError(s, i, "Error getting parent channel", err)
 				return
 			}
-			if labelID == "" {
+			if parent == nil {
 				raiseError(s, i, "Parent channel not found", nil)
 				return
 			}
 			// チャンネルの親チャンネルを変更
-			pastLabelID := getParentID(s, channelID)
+			pastParent, err := getParentfromChild(s, channel.ID)
+			if err != nil {
+				raiseError(s, i, "Error getting parent channel", err)
+				return
+			}
 			channelEditData := discordgo.ChannelEdit{
-				ParentID: labelID,
+				ParentID: parent.ID,
 			}
 			_, err = s.ChannelEditComplex(channel.ID, &channelEditData)
 			if err != nil {
 				raiseError(s, i, "Error editing channel", err)
 				return
 			}
-			if len(getChildIDs(s, i.GuildID, pastLabelID)) == 0 {
-				_, err = s.ChannelDelete(pastLabelID)
+			childIDs, err := getChildIDs(s, i.GuildID, parent.ID)
+			if err != nil {
+				raiseError(s, i, "Error getting child channels", err)
+				return
+			}
+			if len(childIDs) == 0 {
+				_, err = s.ChannelDelete(pastParent.ID)
 				if err != nil {
 					raiseError(s, i, "Error deleting label", err)
 					return
 				}
 			}
-			message := fmt.Sprintf("イベント「%s」を「%s」に移動しました", eventName, eventLabel)
+			message := fmt.Sprintf("イベント「%s」を「%s」に移動しました", channel.Name, parent.Name)
 			sendMessage(s, i, message)
 		}
 	}
@@ -247,8 +251,12 @@ func autocompleteHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	if focusedOption.Name == "label" {
 		labelName := focusedOption.StringValue()
-		parentIDs := getParentIDs(s, i.GuildID)
-		for parentID := range parentIDs {
+		parentIDs, err := getParentIDs(s, i.GuildID)
+		if err != nil {
+			log.Println("Error getting parent IDs:", err)
+			return
+		}
+		for _, parentID := range parentIDs {
 			parent, err := s.Channel(parentID)
 			if err != nil {
 				log.Println("Error getting channel:", err)
@@ -266,7 +274,7 @@ func autocompleteHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		}
 	}
 
-	if focusedOption.Name == "name" {
+	if focusedOption.Name == "name" || focusedOption.Name == "channel" {
 		eventName := focusedOption.StringValue()
 		channels, err := s.GuildChannels(i.GuildID)
 		if err != nil {
@@ -274,6 +282,9 @@ func autocompleteHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			return
 		}
 		for _, channel := range channels {
+			if channel.Type != discordgo.ChannelTypeGuildText {
+				continue
+			}
 			if strings.HasPrefix(strings.ToLower(channel.Name), strings.ToLower(eventName)) || eventName == "" {
 				Choices = append(Choices, &discordgo.ApplicationCommandOptionChoice{
 					Name:  channel.Name,
@@ -293,7 +304,7 @@ func autocompleteHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		},
 	})
 	if err != nil {
-		log.Println("Error responding to interaction:", err)	
+		log.Println("Error responding to interaction:", err)
 		return
 	}
 }
@@ -311,25 +322,25 @@ func reactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 	log.Println(message.Content)
 
 	if strings.HasPrefix(message.Content, newEventPrefix) && strings.HasSuffix(message.Content, newEventSuffix) {
-		eventName := message.Content[len(newEventPrefix):len(message.Content)-len(newEventSuffix)]
+		eventName := message.Content[len(newEventPrefix) : len(message.Content)-len(newEventSuffix)]
 		log.Println(eventName)
-		roleID, err := roleName2ID(s, r.GuildID, eventName)
+		role, err := getRole(s, r.GuildID, eventName)
 		if err != nil {
 			log.Println("Error getting role:", err)
 			return
 		}
-		err = s.GuildMemberRoleAdd(r.GuildID, r.UserID, roleID)
+		err = s.GuildMemberRoleAdd(r.GuildID, r.UserID, role.ID)
 		if err != nil {
 			log.Println("Error adding role:", err)
 			return
 		}
-		channelID, err := channelName2IDwithGuildID(s, r.GuildID, eventName)
+		channel, err := getChannel(s, r.GuildID, eventName)
 		if err != nil {
 			log.Println("Error getting channel:", err)
 			return
 		}
 		message := fmt.Sprintf("<@%s> がこのイベントに参加しました！", r.UserID)
-		s.ChannelMessageSend(channelID, message)
+		s.ChannelMessageSend(channel.ID, message)
 	}
 }
 
@@ -346,25 +357,25 @@ func reactionRemove(s *discordgo.Session, r *discordgo.MessageReactionRemove) {
 	log.Println(message.Content)
 
 	if strings.HasPrefix(message.Content, newEventPrefix) && strings.HasSuffix(message.Content, newEventSuffix) {
-		eventName := message.Content[len(newEventPrefix):len(message.Content)-len(newEventSuffix)]
+		eventName := message.Content[len(newEventPrefix) : len(message.Content)-len(newEventSuffix)]
 		log.Println(eventName)
-		roleID, err := roleName2ID(s, r.GuildID, eventName)
+		role, err := getRole(s, r.GuildID, eventName)
 		if err != nil {
 			log.Println("Error getting role:", err)
 			return
 		}
-		err = s.GuildMemberRoleRemove(r.GuildID, r.UserID, roleID)
+		err = s.GuildMemberRoleRemove(r.GuildID, r.UserID, role.ID)
 		if err != nil {
 			log.Println("Error removing role:", err)
 			return
 		}
-		channelID, err := channelName2IDwithGuildID(s, r.GuildID, eventName)
+		channel, err := getChannel(s, r.GuildID, eventName)
 		if err != nil {
 			log.Println("Error getting channel:", err)
 			return
 		}
 		message := fmt.Sprintf("<@%s> がこのイベントから離脱しました", r.UserID)
-		s.ChannelMessageSend(channelID, message)
+		s.ChannelMessageSend(channel.ID, message)
 	}
 }
 
@@ -379,78 +390,93 @@ func raiseError(s *discordgo.Session, i *discordgo.InteractionCreate, errMessage
 	sendMessage(s, i, errMessage)
 }
 
-func channelName2ID(s *discordgo.Session, i *discordgo.InteractionCreate, channelName string) (string, error) {
+func getChannelwithInteraction(s *discordgo.Session, i *discordgo.InteractionCreate, channelName string) (*discordgo.Channel, error) {
 	// here は送信されたチャンネル
 	if channelName == "here" {
-		return i.ChannelID, nil
+		channel, err := s.Channel(i.ChannelID)
+		if err != nil {
+			return nil, err
+		}
+		return channel, nil
 	}
 
-	return channelName2IDwithGuildID(s, i.GuildID, channelName)
+	return getChannel(s, i.GuildID, channelName)
 }
 
-func channelName2IDwithGuildID(s *discordgo.Session, guildID string, channelName string) (string, error) {
+func getChannel(s *discordgo.Session, guildID string, channelName string) (*discordgo.Channel, error) {
+	// もともとID形式
+	channel, err := s.Channel(channelName)
+	if err == nil {
+		return channel, nil
+	}
+
 	// チャンネルリンク形式
-	if strings.HasPrefix(channelName ,"https://discord") {
-		channelName = strings.Split(channelName, "/")[5]
+	if strings.HasPrefix(channelName, "https://discord") {
+		ID := strings.Split(channelName, "/")[5]
+		channel, err := s.Channel(ID)
+		if err != nil {
+			return nil, err
+		}
+		return channel, nil
 	}
 
 	// チャンネル名の文字列
 	channels, err := s.GuildChannels(guildID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	for _, channel := range channels {
 		if channel.Name == strings.ToLower(channelName) {
-			channelName = channel.ID
-			break
+			return channel, nil
 		}
 	}
-	_, err = s.Channel(channelName)
-	if err != nil {
-		return "", err
-	}
-	return channelName, nil
+	return nil, fmt.Errorf("channel not found")
 }
 
-func roleName2ID(s *discordgo.Session, guildID string, roleName string) (string, error) {
+func getRole(s *discordgo.Session, guildID string, roleName string) (*discordgo.Role, error) {
+	// もともとID形式
+	role, err := s.State.Role(guildID, roleName)
+	if err == nil {
+		return role, nil
+	}
+
 	// ロールメンション形式
 	if strings.HasPrefix(roleName, "<@&") {
-		return strings.TrimRight(strings.TrimLeft(roleName, "<@&"), ">"), nil
+		ID := strings.TrimRight(strings.TrimLeft(roleName, "<@&"), ">")
+		role, err := s.State.Role(guildID, ID)
+		if err != nil {
+			return nil, err
+		}
+		return role, nil
 	}
 
 	// ロール名の文字列
 	roles, err := s.GuildRoles(guildID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+
 	for _, role := range roles {
 		if role.Name == roleName {
-			return role.ID, nil
+			return role, nil
 		}
 	}
 
-	_, err = s.State.Role(guildID, roleName)
-	if err != nil {
-		return "", err
-	}
-	return roleName, nil
+	return nil, fmt.Errorf("role not found")
 }
 
-func getParentID(s *discordgo.Session, channelID string) string {
+func getParentfromChild(s *discordgo.Session, channelID string) (*discordgo.Channel, error) {
 	channel, err := s.Channel(channelID)
 	if err != nil {
-		log.Println("Error getting channel:", err)
-		return ""
+		return nil, err
 	}
-
-	return channel.ParentID
+	return getParent(s, channel.GuildID, channel.ParentID)
 }
 
-func getParentIDs(s *discordgo.Session, guildID string) map[string]string {
+func getParentIDs(s *discordgo.Session, guildID string) ([]string, error) {
 	channels, err := s.GuildChannels(guildID)
 	if err != nil {
-		log.Println("Error getting channels:", err)
-		return nil
+		return nil, err
 	}
 
 	parentIDkeys := make(map[string]struct{})
@@ -459,32 +485,40 @@ func getParentIDs(s *discordgo.Session, guildID string) map[string]string {
 			parentIDkeys[channel.ParentID] = struct{}{}
 		}
 	}
-	parentIDs := make(map[string]string)
+	var parentIDs []string
 	for parentID := range parentIDkeys {
-		parentIDs[parentID] = parentID
+		parentIDs = append(parentIDs, parentID)
 	}
 
-	return parentIDs
+	return parentIDs, nil
 }
 
-func labelName2ID(s *discordgo.Session, guildID string, labelName string) (string, error) {
-	for _, parentID := range getParentIDs(s, guildID) {
+func getParent(s *discordgo.Session, guildID string, parentName string) (*discordgo.Channel, error) {
+	parent, err := s.Channel(parentName)
+	if err == nil {
+		return parent, nil
+	}
+
+	parentIDs, err := getParentIDs(s, guildID)
+	if err != nil {
+		return nil, err
+	}
+	for _, parentID := range parentIDs {
 		parent, err := s.Channel(parentID)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		if parent.Name == labelName {
-			return parentID, nil
+		if parent.Name == parentName {
+			return parent, nil
 		}
 	}
-	return "", nil
+	return nil, fmt.Errorf("parent channel not found")
 }
 
-func getChildIDs(s *discordgo.Session, guildID string, parentID string) []string {
+func getChildIDs(s *discordgo.Session, guildID string, parentID string) ([]string, error) {
 	channels, err := s.GuildChannels(guildID)
 	if err != nil {
-		log.Println("Error getting channels:", err)
-		return nil
+		return nil, err
 	}
 
 	childIDs := make([]string, 0)
@@ -494,5 +528,5 @@ func getChildIDs(s *discordgo.Session, guildID string, parentID string) []string
 		}
 	}
 
-	return childIDs
+	return childIDs, nil
 }
