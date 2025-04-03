@@ -218,7 +218,7 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			if len(childIDs) == 0 {
 				_, err = s.ChannelDelete(pastParent.ID)
 				if err != nil {
-					raiseError(s, i, "Error deleting label", err)
+					raiseError(s, i, "Error deleting category", err)
 					return
 				}
 			}
@@ -249,8 +249,8 @@ func autocompleteHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	Choices := []*discordgo.ApplicationCommandOptionChoice{}
 
-	if focusedOption.Name == "label" {
-		labelName := focusedOption.StringValue()
+	if focusedOption.Name == "category" {
+		parentName := focusedOption.StringValue()
 		parentIDs, err := getParentIDs(s, i.GuildID)
 		if err != nil {
 			log.Println("Error getting parent IDs:", err)
@@ -262,7 +262,7 @@ func autocompleteHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 				log.Println("Error getting channel:", err)
 				continue
 			}
-			if strings.HasPrefix(strings.ToLower(parent.Name), strings.ToLower(labelName)) || labelName == "" {
+			if strings.HasPrefix(strings.ToLower(parent.Name), strings.ToLower(parentName)) || parentName == "" {
 				Choices = append(Choices, &discordgo.ApplicationCommandOptionChoice{
 					Name:  parent.Name,
 					Value: parent.ID,
