@@ -28,6 +28,7 @@ func main() {
 	}
 
 	dg.AddHandler(onInteractionCreate)
+	dg.AddHandler(autocompleteHandler)
 	dg.AddHandler(reactionAdd)
 	dg.AddHandler(reactionRemove)
 
@@ -66,6 +67,7 @@ func main() {
 					Name:        "label",
 					Description: "Label",
 					Required:    true,
+					Autocomplete: true,
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
@@ -84,6 +86,7 @@ func main() {
 					Name:        "name",
 					Description: "Event name",
 					Required:    true,
+					Autocomplete: true,
 				},
 			},
 		},
@@ -96,12 +99,14 @@ func main() {
 					Name:        "name",
 					Description: "Event name",
 					Required:    true,
+					Autocomplete: true,
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "label",
 					Description: "Label",
 					Required:    true,
+					Autocomplete: true,
 				},
 			},
 		},

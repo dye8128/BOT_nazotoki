@@ -224,6 +224,80 @@ func onInteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 }
 
+func autocompleteHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if i.Type != discordgo.InteractionApplicationCommandAutocomplete {
+		return
+	}
+
+	data := i.ApplicationCommandData()
+
+	// 選択中のオプションを取得
+	var focusedOption *discordgo.ApplicationCommandInteractionDataOption
+	for _, opt := range data.Options {
+		if opt.Focused {
+			focusedOption = opt
+			break
+		}
+	}
+	if focusedOption == nil {
+		return
+	}
+
+	Choices := []*discordgo.ApplicationCommandOptionChoice{}
+
+	if focusedOption.Name == "label" {
+		labelName := focusedOption.StringValue()
+		parentIDs := getParentIDs(s, i.GuildID)
+		for parentID := range parentIDs {
+			parent, err := s.Channel(parentID)
+			if err != nil {
+				log.Println("Error getting channel:", err)
+				continue
+			}
+			if strings.HasPrefix(strings.ToLower(parent.Name), strings.ToLower(labelName)) || labelName == "" {
+				Choices = append(Choices, &discordgo.ApplicationCommandOptionChoice{
+					Name:  parent.Name,
+					Value: parent.ID,
+				})
+			}
+			if len(Choices) >= 25 {
+				break
+			}
+		}
+	}
+
+	if focusedOption.Name == "name" {
+		eventName := focusedOption.StringValue()
+		channels, err := s.GuildChannels(i.GuildID)
+		if err != nil {
+			log.Println("Error getting channels:", err)
+			return
+		}
+		for _, channel := range channels {
+			if strings.HasPrefix(strings.ToLower(channel.Name), strings.ToLower(eventName)) || eventName == "" {
+				Choices = append(Choices, &discordgo.ApplicationCommandOptionChoice{
+					Name:  channel.Name,
+					Value: channel.ID,
+				})
+			}
+			if len(Choices) >= 25 {
+				break
+			}
+		}
+	}
+
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionApplicationCommandAutocompleteResult,
+		Data: &discordgo.InteractionResponseData{
+			Choices: Choices,
+		},
+	})
+	if err != nil {
+		log.Println("Error responding to interaction:", err)	
+		return
+	}
+}
+
 func reactionAdd(s *discordgo.Session, r *discordgo.MessageReactionAdd) {
 	if r.UserID == s.State.User.ID {
 		return
