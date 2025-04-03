@@ -512,7 +512,7 @@ func getParent(s *discordgo.Session, guildID string, parentName string) (*discor
 			return parent, nil
 		}
 	}
-	return nil, fmt.Errorf("parent channel not found")
+	return nil, nil
 }
 
 func getChildIDs(s *discordgo.Session, guildID string, parentID string) ([]string, error) {
