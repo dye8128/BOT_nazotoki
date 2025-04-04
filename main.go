@@ -104,8 +104,8 @@ func main() {
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "label",
-					Description: "Label",
+					Name:        "category",
+					Description: "Event category",
 					Required:    true,
 					Autocomplete: true,
 				},
